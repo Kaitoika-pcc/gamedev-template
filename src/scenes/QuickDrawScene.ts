@@ -51,6 +51,7 @@ export class QuickDrawScene extends Phaser.Scene {
   private areaEffect!: Phaser.GameObjects.Arc;
   private spawnTimer: Phaser.Time.TimerEvent | null = null;
   private player!: Phaser.GameObjects.Arc;
+  private playerShip!: Phaser.GameObjects.Graphics;
   private keyW!: Phaser.Input.Keyboard.Key;
   private keyA!: Phaser.Input.Keyboard.Key;
   private keyS!: Phaser.Input.Keyboard.Key;
@@ -102,15 +103,50 @@ export class QuickDrawScene extends Phaser.Scene {
 
   private createBackground(): void {
     const background = this.add.graphics();
-    background.fillGradientStyle(0x101a2c, 0x1b3047, 0x09101f, 0x10243b, 1, 1, 1, 1);
+    background.fillGradientStyle(0x080d2b, 0x151347, 0x030617, 0x08152f, 1, 1, 1, 1);
     background.fillRect(0, 0, 1280, 720);
-    background.lineStyle(1, 0x2d4b64, 0.4);
 
-    for (let x = 0; x <= 1280; x += 80) {
-      background.lineBetween(x, 0, x, 720);
+    for (let index = 0; index < 90; index += 1) {
+      const x = Phaser.Math.Between(20, 1260);
+      const y = Phaser.Math.Between(20, 700);
+      const radius = Phaser.Math.Between(1, 2);
+      background.fillStyle(index % 5 === 0 ? 0x8edbff : 0xffffff, 0.7);
+      background.fillCircle(x, y, radius);
     }
-    for (let y = 0; y <= 720; y += 80) {
-      background.lineBetween(0, y, 1280, y);
+
+    const earth = this.add.circle(1040, 170, 190, 0x16769c, 0.95)
+      .setStrokeStyle(8, 0x76e5ff, 0.65)
+      .setDepth(-4);
+    const earthSurface = this.add.graphics().setDepth(-3);
+    earthSurface.fillStyle(0x248d62, 0.9);
+    earthSurface.fillEllipse(980, 110, 95, 55);
+    earthSurface.fillEllipse(1080, 205, 130, 72);
+    earthSurface.fillEllipse(1000, 260, 70, 45);
+    earthSurface.fillStyle(0x53b978, 0.55);
+    earthSurface.fillEllipse(1120, 95, 55, 35);
+    earthSurface.fillEllipse(950, 185, 45, 80);
+    earthSurface.lineStyle(5, 0xb8f5ff, 0.25);
+    earthSurface.strokeCircle(1040, 170, 198);
+
+    const motionLines = this.add.graphics().setDepth(-2);
+    motionLines.lineStyle(4, 0x48bdf2, 0.55);
+    motionLines.lineBetween(30, 600, 340, 460);
+    motionLines.lineBetween(0, 520, 260, 405);
+    motionLines.lineBetween(230, 700, 470, 565);
+    motionLines.lineStyle(3, 0xffe66d, 0.85);
+    motionLines.lineBetween(80, 650, 290, 555);
+    motionLines.lineBetween(360, 720, 520, 635);
+    motionLines.lineBetween(720, 700, 880, 620);
+
+    const atmosphere = this.add.graphics().setDepth(-1);
+    atmosphere.lineStyle(3, 0x7eeeff, 0.35);
+    atmosphere.strokeCircle(1040, 170, 210);
+    atmosphere.strokeCircle(1040, 170, 220);
+    atmosphere.lineStyle(2, 0xffffff, 0.3);
+    atmosphere.arc(1040, 170, 230, Phaser.Math.DegToRad(160), Phaser.Math.DegToRad(330), false);
+
+    if (earth.visible === false) {
+      earth.setVisible(true);
     }
   }
 
@@ -170,9 +206,59 @@ export class QuickDrawScene extends Phaser.Scene {
   }
 
   private createPlayer(): void {
-    this.player = this.add.circle(640, 360, this.playerRadius, 0x4ecdc4)
-      .setStrokeStyle(4, 0xe8ffff)
+    this.player = this.add.circle(640, 360, this.playerRadius, 0x4ecdc4, 0)
+      .setStrokeStyle(0, 0x000000, 0)
       .setDepth(1);
+    this.playerShip = this.add.graphics().setDepth(5);
+    this.drawPlayerShip();
+    this.playerShip.setPosition(640, 360);
+  }
+
+  private drawPlayerShip(): void {
+    this.playerShip.clear();
+    this.playerShip.lineStyle(3, 0x101820, 1);
+
+    // 添付画像のような、常に正面を向く左右対称の宇宙船
+    this.playerShip.fillStyle(0xe9edf0, 1);
+    this.playerShip.beginPath();
+    this.playerShip.moveTo(0, -58);
+    this.playerShip.lineTo(30, -24);
+    this.playerShip.lineTo(48, 28);
+    this.playerShip.lineTo(23, 45);
+    this.playerShip.lineTo(0, 35);
+    this.playerShip.lineTo(-23, 45);
+    this.playerShip.lineTo(-48, 28);
+    this.playerShip.lineTo(-30, -24);
+    this.playerShip.closePath();
+    this.playerShip.fillPath();
+    this.playerShip.strokePath();
+
+    this.playerShip.fillStyle(0x42a56d, 1);
+    this.playerShip.fillRoundedRect(-48, -8, 22, 45, 7);
+    this.playerShip.fillRoundedRect(26, -8, 22, 45, 7);
+    this.playerShip.lineStyle(3, 0x152d2d, 1);
+    this.playerShip.strokeRoundedRect(-48, -8, 22, 45, 7);
+    this.playerShip.strokeRoundedRect(26, -8, 22, 45, 7);
+
+    // 水色のキャノピー
+    this.playerShip.fillStyle(0x63d4d7, 0.95);
+    this.playerShip.beginPath();
+    this.playerShip.moveTo(0, -42);
+    this.playerShip.lineTo(17, -17);
+    this.playerShip.lineTo(13, 12);
+    this.playerShip.lineTo(0, 22);
+    this.playerShip.lineTo(-13, 12);
+    this.playerShip.lineTo(-17, -17);
+    this.playerShip.closePath();
+    this.playerShip.fillPath();
+    this.playerShip.strokePath();
+
+    // 正面のライトと左右の推進光
+    this.playerShip.fillStyle(0xff5d4d, 1);
+    this.playerShip.fillRoundedRect(-10, -54, 20, 6, 3);
+    this.playerShip.fillStyle(0xffe6a0, 1);
+    this.playerShip.fillRoundedRect(-42, 30, 12, 6, 3);
+    this.playerShip.fillRoundedRect(30, 30, 12, 6, 3);
   }
 
   private hudStyle(): Phaser.Types.GameObjects.Text.TextStyle {
@@ -248,16 +334,15 @@ export class QuickDrawScene extends Phaser.Scene {
   }
 
   private getSpawnDelay(): number {
-    if (this.defeatedCount >= 60) {
-      return 100;
-    }
-    if (this.defeatedCount >= 40) {
-      return 150;
-    }
-    if (this.defeatedCount >= 20) {
-      return 300;
-    }
-    return 800;
+    const reduction = this.defeatedCount >= 60
+      ? 1000
+      : this.defeatedCount >= 40
+        ? 500
+        : this.defeatedCount >= 20
+          ? 250
+          : 0;
+
+    return Math.max(100, 800 - reduction);
   }
 
   private spawnEnemy(): void {
@@ -495,6 +580,7 @@ export class QuickDrawScene extends Phaser.Scene {
 
     this.player.x = Phaser.Math.Clamp(this.player.x, this.playerRadius, 1280 - this.playerRadius);
     this.player.y = Phaser.Math.Clamp(this.player.y, this.playerRadius, 720 - this.playerRadius);
+    this.playerShip.setPosition(this.player.x, this.player.y);
   }
 
   private updateBullets(seconds: number): void {
@@ -641,6 +727,7 @@ export class QuickDrawScene extends Phaser.Scene {
     this.health = this.maxHealth;
     this.defeatedCount = 0;
     this.player.setVisible(false);
+      this.playerShip.setVisible(false);
     this.updateHud();
     this.showOverlay('SPEED GAN', 'Enterキーで開始\n右クリックで射撃 / Escキーでポーズ');
   }
