@@ -13,9 +13,9 @@ interface EnemyData {
 export class QuickDrawScene extends Phaser.Scene {
   private readonly maxHealth = 5;
   private readonly targetDefeats = 20;
-  private readonly maxEnemies = 5;
+  private readonly maxEnemies = 10;
   private readonly enemyRadius = 34;
-  private readonly enemyAttackDelay = 3000;
+  private readonly enemyAttackDelay = 1000;
 
   private state: GameState = 'title';
   private health = this.maxHealth;
@@ -150,7 +150,7 @@ export class QuickDrawScene extends Phaser.Scene {
 
     this.spawnEnemy();
     this.spawnTimer = this.time.addEvent({
-      delay: 1000,
+      delay: 500,   //敵の出てくる時間
       callback: this.spawnEnemy,
       callbackScope: this,
       loop: true,
