@@ -15,7 +15,7 @@ export class QuickDrawScene extends Phaser.Scene {
   private readonly targetDefeats = 20;
   private readonly maxEnemies = 10;
   private readonly enemyRadius = 34;
-  private readonly enemyAttackDelay = 1000;
+  private readonly enemyAttackDelay = 2000;
 
   private state: GameState = 'title';
   private health = this.maxHealth;
@@ -27,6 +27,7 @@ export class QuickDrawScene extends Phaser.Scene {
   private defeatedText!: Phaser.GameObjects.Text;
   private statusText!: Phaser.GameObjects.Text;
   private overlay!: Phaser.GameObjects.Rectangle;
+  private damageFrame!: Phaser.GameObjects.Rectangle;
   private titleText!: Phaser.GameObjects.Text;
   private messageText!: Phaser.GameObjects.Text;
 
@@ -76,6 +77,10 @@ export class QuickDrawScene extends Phaser.Scene {
 
     this.overlay = this.add.rectangle(640, 360, 700, 320, 0x0b1426, 0.95)
       .setStrokeStyle(2, 0x4d7798, 0.9);
+    this.damageFrame = this.add.rectangle(640, 360, 1260, 700, 0x000000, 0)
+      .setStrokeStyle(12, 0xff3344, 1)
+      .setDepth(20)
+      .setVisible(false);
     this.titleText = this.add.text(640, 270, '', {
       fontFamily: 'Georgia, serif',
       fontSize: '54px',
@@ -150,7 +155,7 @@ export class QuickDrawScene extends Phaser.Scene {
 
     this.spawnEnemy();
     this.spawnTimer = this.time.addEvent({
-      delay: 500,   //敵の出てくる時間
+      delay: 800,
       callback: this.spawnEnemy,
       callbackScope: this,
       loop: true,
@@ -203,6 +208,7 @@ export class QuickDrawScene extends Phaser.Scene {
     hitEnemy.label.destroy();
     this.enemies = this.enemies.filter((enemy) => enemy !== hitEnemy);
     this.defeatedCount += 1;
+    this.health = Math.min(this.maxHealth, this.health + 1);
     this.updateHud();
 
     if (this.defeatedCount >= this.targetDefeats) {
@@ -225,6 +231,7 @@ export class QuickDrawScene extends Phaser.Scene {
     this.health -= 1;
     this.updateHud();
     this.statusText.setText('YOU WERE HIT');
+    this.flashDamage();
 
     if (this.health <= 0) {
       this.state = 'gameOver';
@@ -238,6 +245,18 @@ export class QuickDrawScene extends Phaser.Scene {
       `体力  ${'●'.repeat(this.health)}${'○'.repeat(this.maxHealth - this.health)}`,
     );
     this.defeatedText.setText(`撃破数  ${this.defeatedCount} / ${this.targetDefeats}`);
+  }
+
+  private flashDamage(): void {
+    this.tweens.killTweensOf(this.damageFrame);
+    this.damageFrame.setVisible(true).setAlpha(1);
+    this.tweens.add({
+      targets: this.damageFrame,
+      alpha: 0,
+      duration: 350,
+      ease: 'Quad.Out',
+      onComplete: () => this.damageFrame.setVisible(false),
+    });
   }
 
   private clearEnemies(): void {
