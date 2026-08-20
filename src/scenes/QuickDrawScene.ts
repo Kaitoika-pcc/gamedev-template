@@ -216,49 +216,16 @@ export class QuickDrawScene extends Phaser.Scene {
 
   private drawPlayerShip(): void {
     this.playerShip.clear();
-    this.playerShip.lineStyle(3, 0x101820, 1);
+    this.playerShip.fillStyle(0xffffff, 1);
+    this.playerShip.fillCircle(0, 0, this.playerRadius);
+    this.playerShip.lineStyle(3, 0xd9f7ff, 1);
+    this.playerShip.strokeCircle(0, 0, this.playerRadius);
 
-    // 添付画像のような、常に正面を向く左右対称の宇宙船
-    this.playerShip.fillStyle(0xe9edf0, 1);
-    this.playerShip.beginPath();
-    this.playerShip.moveTo(0, -58);
-    this.playerShip.lineTo(30, -24);
-    this.playerShip.lineTo(48, 28);
-    this.playerShip.lineTo(23, 45);
-    this.playerShip.lineTo(0, 35);
-    this.playerShip.lineTo(-23, 45);
-    this.playerShip.lineTo(-48, 28);
-    this.playerShip.lineTo(-30, -24);
-    this.playerShip.closePath();
-    this.playerShip.fillPath();
-    this.playerShip.strokePath();
-
-    this.playerShip.fillStyle(0x42a56d, 1);
-    this.playerShip.fillRoundedRect(-48, -8, 22, 45, 7);
-    this.playerShip.fillRoundedRect(26, -8, 22, 45, 7);
-    this.playerShip.lineStyle(3, 0x152d2d, 1);
-    this.playerShip.strokeRoundedRect(-48, -8, 22, 45, 7);
-    this.playerShip.strokeRoundedRect(26, -8, 22, 45, 7);
-
-    // 水色のキャノピー
-    this.playerShip.fillStyle(0x63d4d7, 0.95);
-    this.playerShip.beginPath();
-    this.playerShip.moveTo(0, -42);
-    this.playerShip.lineTo(17, -17);
-    this.playerShip.lineTo(13, 12);
-    this.playerShip.lineTo(0, 22);
-    this.playerShip.lineTo(-13, 12);
-    this.playerShip.lineTo(-17, -17);
-    this.playerShip.closePath();
-    this.playerShip.fillPath();
-    this.playerShip.strokePath();
-
-    // 正面のライトと左右の推進光
-    this.playerShip.fillStyle(0xff5d4d, 1);
-    this.playerShip.fillRoundedRect(-10, -54, 20, 6, 3);
-    this.playerShip.fillStyle(0xffe6a0, 1);
-    this.playerShip.fillRoundedRect(-42, 30, 12, 6, 3);
-    this.playerShip.fillRoundedRect(30, 30, 12, 6, 3);
+    // 白い円の中央にある小さな水色の円
+    this.playerShip.fillStyle(0x63d4d7, 1);
+    this.playerShip.fillCircle(0, 0, 9);
+    this.playerShip.lineStyle(2, 0x2d8f9f, 1);
+    this.playerShip.strokeCircle(0, 0, 9);
   }
 
   private hudStyle(): Phaser.Types.GameObjects.Text.TextStyle {
