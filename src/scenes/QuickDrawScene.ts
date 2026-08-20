@@ -31,7 +31,7 @@ export class QuickDrawScene extends Phaser.Scene {
   private readonly enemyRadius = 34;
   private readonly enemyAttackDelay = 2000;
   private readonly playerRadius = 24;
-  private readonly playerSpeed = 144;
+  private readonly playerSpeed = 187.2;
   private readonly bulletRadius = 8;
   private readonly bulletSpeed = 300;
   private readonly bossBulletSpeed = this.bulletSpeed * 1.5;
@@ -221,9 +221,9 @@ export class QuickDrawScene extends Phaser.Scene {
     this.playerShip.lineStyle(3, 0xd9f7ff, 1);
     this.playerShip.strokeCircle(0, 0, this.playerRadius);
     this.playerShip.fillStyle(0x63d4d7, 1);
-    this.playerShip.fillCircle(0, 0, 9);
+    this.playerShip.fillCircle(0, 0, 16);
     this.playerShip.lineStyle(2, 0x2d8f9f, 1);
-    this.playerShip.strokeCircle(0, 0, 9);
+    this.playerShip.strokeCircle(0, 0, 16);
   }
 
   private hudStyle(): Phaser.Types.GameObjects.Text.TextStyle {
@@ -466,7 +466,7 @@ export class QuickDrawScene extends Phaser.Scene {
       onComplete: () => {
         this.areaEffect.setVisible(false).setAlpha(1);
         if (this.state === 'boss') {
-          this.health = Math.max(0, this.health - 2);
+          this.health = Math.max(0, this.health - 1);
           this.updateHud();
           this.flashDamage();
           if (this.health <= 0) {
@@ -616,7 +616,7 @@ export class QuickDrawScene extends Phaser.Scene {
       return;
     }
 
-    this.health = Math.max(0, this.health - 2);
+    this.health = Math.max(0, this.health - 1);
     this.updateHud();
     this.statusText.setText('YOU WERE HIT');
     this.flashDamage();
