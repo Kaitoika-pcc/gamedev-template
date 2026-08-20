@@ -10,18 +10,34 @@ interface EnemyData {
   attackTimer: Phaser.Time.TimerEvent;
 }
 
+interface EnemyBullet {
+  shape: Phaser.GameObjects.Arc;
+  velocityX: number;
+  velocityY: number;
+}
+
 export class QuickDrawScene extends Phaser.Scene {
-  private readonly maxHealth = 5;
+  private readonly maxHealth = 10;
   private readonly targetDefeats = 20;
   private readonly maxEnemies = 10;
   private readonly enemyRadius = 34;
   private readonly enemyAttackDelay = 2000;
+  private readonly playerRadius = 24;
+  private readonly playerSpeed = 144;
+  private readonly bulletRadius = 8;
+  private readonly bulletSpeed = 300;
 
   private state: GameState = 'title';
   private health = this.maxHealth;
   private defeatedCount = 0;
   private enemies: EnemyData[] = [];
+  private bullets: EnemyBullet[] = [];
   private spawnTimer: Phaser.Time.TimerEvent | null = null;
+  private player!: Phaser.GameObjects.Arc;
+  private keyW!: Phaser.Input.Keyboard.Key;
+  private keyA!: Phaser.Input.Keyboard.Key;
+  private keyS!: Phaser.Input.Keyboard.Key;
+  private keyD!: Phaser.Input.Keyboard.Key;
   private pointerShape!: Phaser.GameObjects.Graphics;
   private healthText!: Phaser.GameObjects.Text;
   private defeatedText!: Phaser.GameObjects.Text;
@@ -39,7 +55,13 @@ export class QuickDrawScene extends Phaser.Scene {
     this.input.mouse?.disableContextMenu();
     this.createBackground();
     this.createHud();
+    this.createPlayer();
     this.createPointer();
+
+    this.keyW = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.W);
+    this.keyA = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.A);
+    this.keyS = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.S);
+    this.keyD = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.D);
 
     this.input.on('pointermove', this.updatePointer, this);
     this.input.on('pointerdown', this.handlePointerDown, this);
@@ -47,6 +69,15 @@ export class QuickDrawScene extends Phaser.Scene {
     this.input.keyboard?.on('keydown-ESC', this.handleEscape, this);
 
     this.showTitle();
+  }
+
+  update(_time: number, delta: number): void {
+    if (this.state !== 'playing') {
+      return;
+    }
+
+    this.movePlayer(delta / 1000);
+    this.updateBullets(delta / 1000);
   }
 
   private createBackground(): void {
@@ -93,6 +124,12 @@ export class QuickDrawScene extends Phaser.Scene {
       color: '#a9c1d1',
       align: 'center',
     }).setOrigin(0.5);
+  }
+
+  private createPlayer(): void {
+    this.player = this.add.circle(640, 360, this.playerRadius, 0x4ecdc4)
+      .setStrokeStyle(4, 0xe8ffff)
+      .setDepth(1);
   }
 
   private hudStyle(): Phaser.Types.GameObjects.Text.TextStyle {
@@ -146,11 +183,13 @@ export class QuickDrawScene extends Phaser.Scene {
 
   private startGame(): void {
     this.clearEnemies();
+    this.clearBullets();
     this.state = 'playing';
     this.health = this.maxHealth;
     this.defeatedCount = 0;
     this.updateHud();
     this.hideOverlay();
+    this.player.setPosition(640, 360).setVisible(true);
     this.statusText.setText('TARGETS INCOMING');
 
     this.spawnEnemy();
@@ -225,10 +264,82 @@ export class QuickDrawScene extends Phaser.Scene {
       return;
     }
 
+    const direction = new Phaser.Math.Vector2(
+      this.player.x - enemy.x,
+      this.player.y - enemy.y,
+    ).normalize();
+    const bullet = this.add.circle(enemy.x, enemy.y, this.bulletRadius, 0xff9f43)
+      .setStrokeStyle(2, 0xfff0bd)
+      .setDepth(2);
+    this.bullets.push({
+      shape: bullet,
+      velocityX: direction.x * this.bulletSpeed,
+      velocityY: direction.y * this.bulletSpeed,
+    });
+
     enemy.shape.destroy();
     enemy.label.destroy();
     this.enemies = this.enemies.filter((current) => current !== enemy);
-    this.health -= 1;
+    this.statusText.setText('INCOMING FIRE');
+  }
+
+  private movePlayer(seconds: number): void {
+    let directionX = 0;
+    let directionY = 0;
+
+    if (this.keyA.isDown) directionX -= 1;
+    if (this.keyD.isDown) directionX += 1;
+    if (this.keyW.isDown) directionY -= 1;
+    if (this.keyS.isDown) directionY += 1;
+
+    if (directionX !== 0 || directionY !== 0) {
+      const direction = new Phaser.Math.Vector2(directionX, directionY).normalize();
+      this.player.x += direction.x * this.playerSpeed * seconds;
+      this.player.y += direction.y * this.playerSpeed * seconds;
+    }
+
+    this.player.x = Phaser.Math.Clamp(this.player.x, this.playerRadius, 1280 - this.playerRadius);
+    this.player.y = Phaser.Math.Clamp(this.player.y, this.playerRadius, 720 - this.playerRadius);
+  }
+
+  private updateBullets(seconds: number): void {
+    const remainingBullets: EnemyBullet[] = [];
+
+    for (const bullet of this.bullets) {
+      bullet.shape.x += bullet.velocityX * seconds;
+      bullet.shape.y += bullet.velocityY * seconds;
+
+      const distance = Phaser.Math.Distance.Between(
+        bullet.shape.x,
+        bullet.shape.y,
+        this.player.x,
+        this.player.y,
+      );
+      const hitPlayer = distance <= this.playerRadius + this.bulletRadius;
+      const outsideScreen = bullet.shape.x < -this.bulletRadius
+        || bullet.shape.x > 1280 + this.bulletRadius
+        || bullet.shape.y < -this.bulletRadius
+        || bullet.shape.y > 720 + this.bulletRadius;
+
+      if (hitPlayer) {
+        bullet.shape.destroy();
+        this.takeBulletDamage();
+      } else if (outsideScreen) {
+        bullet.shape.destroy();
+      } else {
+        remainingBullets.push(bullet);
+      }
+    }
+
+    this.bullets = remainingBullets;
+  }
+
+  private takeBulletDamage(): void {
+    if (this.state !== 'playing') {
+      return;
+    }
+
+    this.health = Math.max(0, this.health - 2);
     this.updateHud();
     this.statusText.setText('YOU WERE HIT');
     this.flashDamage();
@@ -268,6 +379,13 @@ export class QuickDrawScene extends Phaser.Scene {
     this.enemies = [];
   }
 
+  private clearBullets(): void {
+    for (const bullet of this.bullets) {
+      bullet.shape.destroy();
+    }
+    this.bullets = [];
+  }
+
   private stopSpawnTimer(): void {
     this.spawnTimer?.remove();
     this.spawnTimer = null;
@@ -276,10 +394,12 @@ export class QuickDrawScene extends Phaser.Scene {
   private showTitle(): void {
     this.stopSpawnTimer();
     this.clearEnemies();
+    this.clearBullets();
     this.state = 'title';
     this.time.paused = false;
     this.health = this.maxHealth;
     this.defeatedCount = 0;
+    this.player.setVisible(false);
     this.updateHud();
     this.showOverlay('SPEED GAN', 'Enterキーで開始\n右クリックで射撃 / Escキーでポーズ');
   }
