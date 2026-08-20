@@ -220,8 +220,6 @@ export class QuickDrawScene extends Phaser.Scene {
     this.playerShip.fillCircle(0, 0, this.playerRadius);
     this.playerShip.lineStyle(3, 0xd9f7ff, 1);
     this.playerShip.strokeCircle(0, 0, this.playerRadius);
-
-    // 白い円の中央にある小さな水色の円
     this.playerShip.fillStyle(0x63d4d7, 1);
     this.playerShip.fillCircle(0, 0, 9);
     this.playerShip.lineStyle(2, 0x2d8f9f, 1);
@@ -289,6 +287,7 @@ export class QuickDrawScene extends Phaser.Scene {
     this.updateHud();
     this.hideOverlay();
     this.player.setPosition(640, 360).setVisible(true);
+    this.playerShip.setPosition(640, 360).setVisible(true);
     this.statusText.setText('TARGETS INCOMING');
 
     this.spawnEnemy();
