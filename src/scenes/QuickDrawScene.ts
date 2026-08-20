@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 
-type GameState = 'title' | 'playing' | 'paused' | 'gameOver' | 'clear';
+type GameState = 'title' | 'playing' | 'warning' | 'boss' | 'paused' | 'gameOver' | 'clear';
 
 interface EnemyData {
   x: number;
@@ -16,9 +16,17 @@ interface EnemyBullet {
   velocityY: number;
 }
 
+interface BossData {
+  shape: Phaser.GameObjects.Rectangle;
+  label: Phaser.GameObjects.Text;
+  bulletTimer: Phaser.Time.TimerEvent;
+  areaTimer: Phaser.Time.TimerEvent;
+  health: number;
+}
+
 export class QuickDrawScene extends Phaser.Scene {
   private readonly maxHealth = 10;
-  private readonly targetDefeats = 20;
+  private readonly targetDefeats = 100;
   private readonly maxEnemies = 10;
   private readonly enemyRadius = 34;
   private readonly enemyAttackDelay = 2000;
@@ -26,12 +34,21 @@ export class QuickDrawScene extends Phaser.Scene {
   private readonly playerSpeed = 144;
   private readonly bulletRadius = 8;
   private readonly bulletSpeed = 300;
+  private readonly bossBulletSpeed = this.bulletSpeed * 1.5;
+  private readonly bossSize = 300;
+  private readonly bossMaxHealth = 100;
 
   private state: GameState = 'title';
   private health = this.maxHealth;
   private defeatedCount = 0;
   private enemies: EnemyData[] = [];
   private bullets: EnemyBullet[] = [];
+  private bossBullets: EnemyBullet[] = [];
+  private boss: BossData | null = null;
+  private warningText!: Phaser.GameObjects.Text;
+  private bossHealthBackground!: Phaser.GameObjects.Rectangle;
+  private bossHealthFill!: Phaser.GameObjects.Rectangle;
+  private areaEffect!: Phaser.GameObjects.Arc;
   private spawnTimer: Phaser.Time.TimerEvent | null = null;
   private player!: Phaser.GameObjects.Arc;
   private keyW!: Phaser.Input.Keyboard.Key;
@@ -72,12 +89,15 @@ export class QuickDrawScene extends Phaser.Scene {
   }
 
   update(_time: number, delta: number): void {
-    if (this.state !== 'playing') {
+    if (this.state !== 'playing' && this.state !== 'boss') {
       return;
     }
 
     this.movePlayer(delta / 1000);
     this.updateBullets(delta / 1000);
+    if (this.state === 'boss') {
+      this.updateBossBullets(delta / 1000);
+    }
   }
 
   private createBackground(): void {
@@ -111,6 +131,29 @@ export class QuickDrawScene extends Phaser.Scene {
     this.damageFrame = this.add.rectangle(640, 360, 1260, 700, 0x000000, 0)
       .setStrokeStyle(12, 0xff3344, 1)
       .setDepth(20)
+      .setVisible(false);
+    this.warningText = this.add.text(640, 150, 'WARNING', {
+      fontFamily: 'sans-serif',
+      fontSize: '64px',
+      color: '#ff3344',
+      fontStyle: 'bold',
+      stroke: '#240008',
+      strokeThickness: 8,
+      align: 'center',
+    }).setOrigin(0.5).setDepth(15).setVisible(false);
+    this.bossHealthBackground = this.add.rectangle(490, 475, 300, 20, 0x351521)
+      .setOrigin(0, 0.5)
+      .setStrokeStyle(2, 0xffc0c0)
+      .setDepth(12)
+      .setVisible(false);
+    this.bossHealthFill = this.add.rectangle(490, 475, 300, 20, 0xe53935)
+      .setOrigin(0, 0.5)
+      .setDisplaySize(0, 20)
+      .setDepth(13)
+      .setVisible(false);
+    this.areaEffect = this.add.circle(640, 360, 150, 0xff304f, 0.35)
+      .setStrokeStyle(6, 0xff3344, 0.95)
+      .setDepth(9)
       .setVisible(false);
     this.titleText = this.add.text(640, 270, '', {
       fontFamily: 'Georgia, serif',
@@ -156,7 +199,7 @@ export class QuickDrawScene extends Phaser.Scene {
   }
 
   private handlePointerDown(pointer: Phaser.Input.Pointer): void {
-    if (this.state === 'playing' && pointer.button === 2) {
+    if ((this.state === 'playing' || this.state === 'boss') && pointer.button === 2) {
       this.fire(pointer.x, pointer.y);
     }
   }
@@ -170,7 +213,7 @@ export class QuickDrawScene extends Phaser.Scene {
   }
 
   private handleEscape(): void {
-    if (this.state === 'playing') {
+    if (this.state === 'playing' || this.state === 'boss') {
       this.state = 'paused';
       this.time.paused = true;
       this.showOverlay('PAUSED', 'Escキーで再開');
@@ -184,6 +227,9 @@ export class QuickDrawScene extends Phaser.Scene {
   private startGame(): void {
     this.clearEnemies();
     this.clearBullets();
+    this.clearBoss();
+    this.warningText.setVisible(false);
+    this.areaEffect.setVisible(false);
     this.state = 'playing';
     this.health = this.maxHealth;
     this.defeatedCount = 0;
@@ -194,11 +240,24 @@ export class QuickDrawScene extends Phaser.Scene {
 
     this.spawnEnemy();
     this.spawnTimer = this.time.addEvent({
-      delay: 800,
+      delay: this.getSpawnDelay(),
       callback: this.spawnEnemy,
       callbackScope: this,
       loop: true,
     });
+  }
+
+  private getSpawnDelay(): number {
+    if (this.defeatedCount >= 60) {
+      return 100;
+    }
+    if (this.defeatedCount >= 40) {
+      return 150;
+    }
+    if (this.defeatedCount >= 20) {
+      return 300;
+    }
+    return 800;
   }
 
   private spawnEnemy(): void {
@@ -232,6 +291,11 @@ export class QuickDrawScene extends Phaser.Scene {
   }
 
   private fire(x: number, y: number): void {
+    if (this.state === 'boss') {
+      this.damageBoss(x, y);
+      return;
+    }
+
     const hitEnemy = this.enemies.find((enemy) => {
       const distance = Phaser.Math.Distance.Between(x, y, enemy.x, enemy.y);
       return distance <= this.enemyRadius;
@@ -250,13 +314,144 @@ export class QuickDrawScene extends Phaser.Scene {
     this.health = Math.min(this.maxHealth, this.health + 1);
     this.updateHud();
 
-    if (this.defeatedCount >= this.targetDefeats) {
-      this.state = 'clear';
-      this.stopSpawnTimer();
-      this.showResult('CLEAR', 'Congratulations!\nEnterキーでタイトルへ');
+    if (this.defeatedCount === 99) {
+      this.beginBossWarning();
+    } else if (this.defeatedCount >= 20 && this.defeatedCount % 20 === 0) {
+      this.restartSpawnTimer();
     } else {
       this.statusText.setText(`HIT CONFIRMED  /  TARGETS  ${this.enemies.length}`);
     }
+  }
+
+  private restartSpawnTimer(): void {
+    this.stopSpawnTimer();
+    this.spawnTimer = this.time.addEvent({
+      delay: this.getSpawnDelay(),
+      callback: this.spawnEnemy,
+      callbackScope: this,
+      loop: true,
+    });
+  }
+
+  private beginBossWarning(): void {
+    this.stopSpawnTimer();
+    this.clearEnemies();
+    this.clearBullets();
+    this.state = 'warning';
+    this.warningText.setVisible(true).setText('WARNING');
+    this.statusText.setText('BOSS INCOMING');
+    this.time.delayedCall(3000, this.startBoss, [], this);
+  }
+
+  private startBoss(): void {
+    if (this.state !== 'warning') {
+      return;
+    }
+
+    this.state = 'boss';
+    this.warningText.setVisible(false);
+    const shape = this.add.rectangle(640, 270, this.bossSize, this.bossSize, 0x6f1d3a)
+      .setStrokeStyle(8, 0xff5c7a)
+      .setDepth(2);
+    const label = this.add.text(640, 260, 'BOSS', {
+      fontFamily: 'Georgia, serif',
+      fontSize: '42px',
+      color: '#ffe1e8',
+      fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(3);
+    const boss: BossData = {
+      shape,
+      label,
+      health: this.bossMaxHealth,
+      bulletTimer: this.time.addEvent({
+        delay: 300,
+        callback: () => this.fireBossBullet(boss),
+        loop: true,
+      }),
+      areaTimer: this.time.addEvent({
+        delay: 10000,
+        callback: () => this.fireBossAreaAttack(),
+        loop: true,
+      }),
+    };
+    this.boss = boss;
+    this.bossHealthBackground.setVisible(true);
+    this.bossHealthFill.setVisible(true);
+    this.updateBossHealthBar();
+    this.statusText.setText('BOSS BATTLE');
+  }
+
+  private fireBossBullet(boss: BossData): void {
+    if (this.state !== 'boss' || this.boss !== boss) {
+      return;
+    }
+
+    const direction = new Phaser.Math.Vector2(
+      this.player.x - boss.shape.x,
+      this.player.y - boss.shape.y,
+    ).normalize();
+    const bullet = this.add.circle(boss.shape.x, boss.shape.y, this.bulletRadius, 0xffd166)
+      .setStrokeStyle(2, 0xffffff)
+      .setDepth(4);
+    this.bossBullets.push({
+      shape: bullet,
+      velocityX: direction.x * this.bossBulletSpeed,
+      velocityY: direction.y * this.bossBulletSpeed,
+    });
+  }
+
+  private fireBossAreaAttack(): void {
+    if (this.state !== 'boss') {
+      return;
+    }
+
+    this.areaEffect.setPosition(this.player.x, this.player.y).setVisible(true).setScale(0.2);
+    this.tweens.add({
+      targets: this.areaEffect,
+      scale: 1,
+      alpha: 0,
+      duration: 700,
+      ease: 'Quad.Out',
+      onComplete: () => {
+        this.areaEffect.setVisible(false).setAlpha(1);
+        if (this.state === 'boss') {
+          this.health = Math.max(0, this.health - 2);
+          this.updateHud();
+          this.flashDamage();
+          if (this.health <= 0) {
+            this.endGame('GAME OVER', `撃破数：${this.defeatedCount}\nEnterキーでタイトルへ`);
+          }
+        }
+      },
+    });
+  }
+
+  private damageBoss(x: number, y: number): void {
+    if (this.boss === null) {
+      return;
+    }
+
+    const hit = Phaser.Geom.Rectangle.Contains(this.boss.shape.getBounds(), x, y);
+    if (!hit) {
+      this.statusText.setText('MISSED');
+      return;
+    }
+
+    this.boss.health -= 1;
+    this.updateBossHealthBar();
+    if (this.boss.health <= 0) {
+      this.defeatedCount = this.targetDefeats;
+      this.endGame('CLEAR', 'Congratulations!\nEnterキーでタイトルへ');
+    }
+  }
+
+  private updateBossHealthBar(): void {
+    if (this.boss === null) {
+      return;
+    }
+
+    const damageRatio = 1 - this.boss.health / this.bossMaxHealth;
+    this.bossHealthFill.setDisplaySize(300 * damageRatio, 20);
   }
 
   private enemyAttacks(enemy: EnemyData): void {
@@ -334,6 +529,36 @@ export class QuickDrawScene extends Phaser.Scene {
     this.bullets = remainingBullets;
   }
 
+  private updateBossBullets(seconds: number): void {
+    const remainingBullets: EnemyBullet[] = [];
+
+    for (const bullet of this.bossBullets) {
+      bullet.shape.x += bullet.velocityX * seconds;
+      bullet.shape.y += bullet.velocityY * seconds;
+      const distance = Phaser.Math.Distance.Between(
+        bullet.shape.x,
+        bullet.shape.y,
+        this.player.x,
+        this.player.y,
+      );
+      const outsideScreen = bullet.shape.x < -this.bulletRadius
+        || bullet.shape.x > 1280 + this.bulletRadius
+        || bullet.shape.y < -this.bulletRadius
+        || bullet.shape.y > 720 + this.bulletRadius;
+
+      if (distance <= this.playerRadius + this.bulletRadius) {
+        bullet.shape.destroy();
+        this.takeBulletDamage();
+      } else if (outsideScreen) {
+        bullet.shape.destroy();
+      } else {
+        remainingBullets.push(bullet);
+      }
+    }
+
+    this.bossBullets = remainingBullets;
+  }
+
   private takeBulletDamage(): void {
     if (this.state !== 'playing') {
       return;
@@ -345,9 +570,7 @@ export class QuickDrawScene extends Phaser.Scene {
     this.flashDamage();
 
     if (this.health <= 0) {
-      this.state = 'gameOver';
-      this.stopSpawnTimer();
-      this.showResult('GAME OVER', `撃破数：${this.defeatedCount}\nEnterキーでタイトルへ`);
+      this.endGame('GAME OVER', `撃破数：${this.defeatedCount}\nEnterキーでタイトルへ`);
     }
   }
 
@@ -384,6 +607,23 @@ export class QuickDrawScene extends Phaser.Scene {
       bullet.shape.destroy();
     }
     this.bullets = [];
+    for (const bullet of this.bossBullets) {
+      bullet.shape.destroy();
+    }
+    this.bossBullets = [];
+  }
+
+  private clearBoss(): void {
+    if (this.boss !== null) {
+      this.boss.bulletTimer.remove();
+      this.boss.areaTimer.remove();
+      this.boss.shape.destroy();
+      this.boss.label.destroy();
+      this.boss = null;
+    }
+    this.bossHealthBackground.setVisible(false);
+    this.bossHealthFill.setVisible(false);
+    this.areaEffect.setVisible(false);
   }
 
   private stopSpawnTimer(): void {
@@ -395,6 +635,7 @@ export class QuickDrawScene extends Phaser.Scene {
     this.stopSpawnTimer();
     this.clearEnemies();
     this.clearBullets();
+    this.clearBoss();
     this.state = 'title';
     this.time.paused = false;
     this.health = this.maxHealth;
@@ -402,6 +643,14 @@ export class QuickDrawScene extends Phaser.Scene {
     this.player.setVisible(false);
     this.updateHud();
     this.showOverlay('SPEED GAN', 'Enterキーで開始\n右クリックで射撃 / Escキーでポーズ');
+  }
+
+  private endGame(title: string, message: string): void {
+    this.state = title === 'CLEAR' ? 'clear' : 'gameOver';
+    this.stopSpawnTimer();
+    this.clearBullets();
+    this.clearBoss();
+    this.showResult(title, message);
   }
 
   private showResult(title: string, message: string): void {
